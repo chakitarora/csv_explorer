@@ -8,7 +8,7 @@ Drop in any CSV or TSV file and instantly get summary statistics, column profile
 
 ## Live demo
 
-👉 `https://chakitarora.github.io/csv-explorer`
+👉 `https://chakitarora.github.io/csv_explorer`
 
 ---
 
