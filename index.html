@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CSV Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e1117;--surface:#161b27;--surface2:#1e2535;--surface3:#252d40;
+  --border:#2a3347;--border2:#3a4a66;
+  --text:#e2e8f4;--muted:#6b7a99;--dim:#3d4f6e;
+  --accent:#4f8ef7;--green:#3ecf8e;--yellow:#f5c842;--red:#f76f6f;--purple:#b57ef7;--orange:#f7945a;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;--r:6px;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+/* scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── Header ── */
+header{padding:12px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;background:var(--surface);position:sticky;top:0;z-index:100}
+.logo{font-family:var(--mono);font-weight:600;font-size:0.95rem;color:var(--accent)}
+.logo span{color:var(--muted)}
+#file-info{font-family:var(--mono);font-size:0.72rem;color:var(--muted);margin-left:auto}
+.hdr-btn{font-family:var(--sans);font-size:0.78rem;padding:5px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--muted);cursor:pointer;transition:all 0.15s}
+.hdr-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── Drop zone ── */
+#landing{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 49px);padding:40px 24px}
+#drop-zone{border:1.5px dashed var(--border2);border-radius:12px;padding:72px 48px;text-align:center;cursor:pointer;transition:all 0.15s;position:relative;max-width:520px;width:100%;background:var(--surface)}
+#drop-zone.dragover{border-color:var(--accent);background:#1a2540}
+#drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz-icon{font-size:2.8rem;margin-bottom:16px;display:block;opacity:0.6}
+.dz-title{font-size:1.1rem;font-weight:600;margin-bottom:6px}
+.dz-sub{font-size:0.82rem;color:var(--muted)}
+.dz-hint{margin-top:20px;font-family:var(--mono);font-size:0.72rem;color:var(--dim)}
+
+/* ── App shell ── */
+#app{display:none;height:calc(100vh - 49px)}
+#app.visible{display:flex;flex-direction:column}
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 24px;gap:2px;background:var(--surface);flex-shrink:0;overflow-x:auto}
+.tab{font-size:0.8rem;font-weight:500;padding:10px 14px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;margin-bottom:-1px;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.panels{flex:1;overflow:hidden;position:relative}
+.panel{display:none;height:100%;overflow-y:auto;padding:24px}
+.panel.active{display:block}
+
+/* ── Shared ── */
+.sec-title{font-family:var(--mono);font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.badge{font-family:var(--mono);font-size:0.65rem;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.badge-numeric{background:#1a3a5c;color:var(--accent)}
+.badge-text{background:#1e3a2e;color:var(--green)}
+.badge-boolean{background:#3a2e1a;color:var(--yellow)}
+.badge-date{background:#2e1a3a;color:var(--purple)}
+.badge-mixed{background:#2e1a1a;color:var(--red)}
+.btn{font-family:var(--sans);font-size:0.8rem;font-weight:500;padding:7px 14px;border-radius:var(--r);cursor:pointer;transition:all 0.15s;border:1px solid var(--border);background:var(--surface2);color:var(--text)}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:#3a7ae0;border-color:#3a7ae0;color:#fff}
+
+/* ── Overview ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.stat-val{font-family:var(--mono);font-size:1.5rem;font-weight:600;color:var(--accent);line-height:1;margin-bottom:4px}
+.stat-lbl{font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em}
+.warn-card{background:#1f1a10;border:1px solid #4a3a10;border-radius:var(--r);padding:12px 16px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start}
+.warn-icon{color:var(--yellow);flex-shrink:0;margin-top:1px}
+.warn-text{font-size:0.82rem;color:#c8a84a}
+
+/* ── Columns panel ── */
+.col-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.col-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.col-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px}
+.col-name{font-family:var(--mono);font-size:0.8rem;font-weight:600;word-break:break-all}
+.col-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px}
+.cs-item .k{font-size:0.68rem;color:var(--muted)}
+.cs-item .v{font-family:var(--mono);font-size:0.78rem}
+.sparkline{display:flex;align-items:flex-end;gap:2px;height:26px;margin-top:8px}
+.spark-bar{flex:1;border-radius:2px 2px 0 0;background:var(--accent);opacity:0.7;min-height:2px}
+.freq-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:0.7rem}
+.freq-label{color:var(--muted);min-width:56px;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
+.freq-track{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.freq-fill{height:100%;border-radius:3px;background:var(--accent)}
+.freq-n{color:var(--dim);min-width:28px;text-align:right;font-family:var(--mono)}
+.missing-bar{height:3px;border-radius:2px;background:var(--border);overflow:hidden;margin-top:8px}
+.missing-fill{height:100%;background:var(--red);border-radius:2px}
+.missing-lbl{font-size:0.67rem;color:var(--muted);margin-top:3px}
+
+/* ── Data table ── */
+.table-toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.search-input{font-family:var(--mono);font-size:0.8rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:7px 12px;color:var(--text);outline:none;width:220px;transition:border-color 0.15s}
+.search-input:focus{border-color:var(--accent)}
+.search-input::placeholder{color:var(--dim)}
+select.filter-sel{font-family:var(--mono);font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;color:var(--text);outline:none;cursor:pointer}
+select.filter-sel:focus{border-color:var(--accent)}
+.row-count{font-family:var(--mono);font-size:0.72rem;color:var(--muted);margin-left:auto}
+.tbl-wrap{overflow:auto;border:1px solid var(--border);border-radius:var(--r);max-height:calc(100vh - 280px)}
+table{width:100%;border-collapse:collapse;font-size:0.78rem}
+thead th{background:var(--surface2);font-family:var(--mono);font-size:0.68rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;padding:9px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;position:sticky;top:0;z-index:1}
+thead th:hover{color:var(--text)}
+thead th.sort-asc::after{content:' ↑';color:var(--accent)}
+thead th.sort-desc::after{content:' ↓';color:var(--accent)}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--surface2)}
+tbody td{padding:7px 12px;font-family:var(--mono);font-size:0.76rem;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.null-cell{color:var(--dim);font-style:italic}
+td.outlier-cell{background:#2a1010;color:var(--red)}
+.pagination{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:0.78rem;color:var(--muted)}
+
+/* ── Filter builder ── */
+.filter-builder{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px}
+.filter-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.filter-row:last-child{margin-bottom:0}
+.filter-row select,.filter-row input{font-family:var(--mono);font-size:0.78rem;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 10px;color:var(--text);outline:none}
+.filter-row select:focus,.filter-row input:focus{border-color:var(--accent)}
+.rm-filter{background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;padding:0 4px;opacity:0.6}
+.rm-filter:hover{opacity:1}
+
+/* ── Viz panel ── */
+.viz-toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.viz-sel{font-family:var(--mono);font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;color:var(--text);outline:none;cursor:pointer}
+.viz-sel:focus{border-color:var(--accent)}
+#chart-container{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;min-height:360px;position:relative}
+svg text{font-family:var(--mono)}
+
+/* ── Correlation ── */
+#corr-container{overflow:auto}
+.corr-grid{display:inline-grid;gap:2px}
+.corr-cell{width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:0.6rem;border-radius:3px;cursor:default;transition:transform 0.1s}
+.corr-cell:hover{transform:scale(1.15);z-index:1;position:relative}
+.corr-label{font-family:var(--mono);font-size:0.65rem;color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg);overflow:hidden;max-height:80px;white-space:nowrap}
+
+/* ── Missing panel ── */
+.mv-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.mv-row:last-child{border-bottom:none}
+.mv-col{font-family:var(--mono);font-size:0.78rem;min-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mv-track{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.mv-fill{height:100%;border-radius:3px}
+.mv-pct{font-family:var(--mono);font-size:0.75rem;color:var(--muted);min-width:42px;text-align:right}
+.mv-n{font-family:var(--mono);font-size:0.72rem;color:var(--dim);min-width:60px;text-align:right}
+.no-missing{color:var(--green);font-family:var(--mono);font-size:0.9rem;padding:40px 0;text-align:center}
+
+/* ── Duplicate panel ── */
+.dup-result{font-family:var(--mono);font-size:0.82rem;margin-bottom:16px;color:var(--muted)}
+.dup-result span{color:var(--text)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">csv<span>.</span>explore</div>
+  <div id="file-info"></div>
+  <label class="hdr-btn" style="cursor:pointer">↑ Load new file<input type="file" accept=".csv,.tsv" style="display:none" id="reload-input"/></label>
+</header>
+
+<div id="landing">
+  <div id="drop-zone">
+    <input type="file" id="file-input" accept=".csv,.tsv,.txt"/>
+    <span class="dz-icon">⬡</span>
+    <div class="dz-title">Drop a CSV or TSV file</div>
+    <div class="dz-sub">or click to browse</div>
+    <div class="dz-hint">runs entirely in your browser · no uploads · no size limit</div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="tabs">
+    <button class="tab active" data-tab="overview">Overview</button>
+    <button class="tab" data-tab="columns">Columns</button>
+    <button class="tab" data-tab="data">Data</button>
+    <button class="tab" data-tab="visualise">Visualise</button>
+    <button class="tab" data-tab="correlations">Correlations</button>
+    <button class="tab" data-tab="missing">Missing</button>
+    <button class="tab" data-tab="duplicates">Duplicates</button>
+  </div>
+  <div class="panels">
+
+    <!-- Overview -->
+    <div class="panel active" id="panel-overview">
+      <div class="stat-grid" id="overview-stats"></div>
+      <div id="overview-warnings"></div>
+      <div class="sec-title">Column type breakdown</div>
+      <div id="type-breakdown"></div>
+      <div class="sec-title" style="margin-top:20px">Copy as</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="copy-btns"></div>
+    </div>
+
+    <!-- Columns -->
+    <div class="panel" id="panel-columns">
+      <div class="col-grid" id="col-grid"></div>
+    </div>
+
+    <!-- Data -->
+    <div class="panel" id="panel-data">
+      <div id="filter-builder-wrap"></div>
+      <div class="table-toolbar">
+        <input class="search-input" id="search-box" type="text" placeholder="Search all rows…"/>
+        <button class="btn" onclick="addFilterRow()">+ Filter</button>
+        <button class="btn" id="export-btn">↓ Export filtered CSV</button>
+        <button class="btn" id="export-json-btn">↓ JSON</button>
+        <span class="row-count" id="row-count"></span>
+      </div>
+      <div class="tbl-wrap"><table id="data-table"><thead id="tbl-head"></thead><tbody id="tbl-body"></tbody></table></div>
+      <div class="pagination">
+        <button class="btn" id="prev-btn" onclick="changePage(-1)">← Prev</button>
+        <span id="page-info"></span>
+        <button class="btn" id="next-btn" onclick="changePage(1)">Next →</button>
+        <select class="filter-sel" id="page-size-sel" style="margin-left:auto">
+          <option value="50">50 / page</option>
+          <option value="100">100 / page</option>
+          <option value="250">250 / page</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Visualise -->
+    <div class="panel" id="panel-visualise">
+      <div class="viz-toolbar">
+        <select class="viz-sel" id="viz-type">
+          <option value="histogram">Histogram</option>
+          <option value="bar">Bar chart (top values)</option>
+          <option value="scatter">Scatter plot</option>
+          <option value="boxplot">Box plot</option>
+          <option value="line">Line chart</option>
+        </select>
+        <select class="viz-sel" id="viz-col-x"><option>—</option></select>
+        <select class="viz-sel" id="viz-col-y" style="display:none"><option>—</option></select>
+        <button class="btn btn-primary" onclick="renderViz()">Draw</button>
+        <button class="btn" onclick="exportSVG()">↓ SVG</button>
+      </div>
+      <div id="chart-container"><div style="color:var(--muted);font-size:0.85rem;padding:40px;text-align:center">Pick a chart type and column above.</div></div>
+    </div>
+
+    <!-- Correlations -->
+    <div class="panel" id="panel-correlations">
+      <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary" onclick="renderCorr()">Compute correlation matrix</button>
+        <span style="font-size:0.78rem;color:var(--muted)">Numeric columns only · Pearson r</span>
+      </div>
+      <div id="corr-container"><div style="color:var(--muted);font-size:0.82rem">Click compute to generate the matrix.</div></div>
+    </div>
+
+    <!-- Missing -->
+    <div class="panel" id="panel-missing">
+      <div class="sec-title">Missing & null values by column</div>
+      <div id="missing-content"></div>
+    </div>
+
+    <!-- Duplicates -->
+    <div class="panel" id="panel-duplicates">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="findDuplicates('exact')">Find exact duplicates</button>
+        <button class="btn" onclick="findDuplicates('key')">Duplicate keys…</button>
+        <select class="viz-sel" id="dup-key-col"><option>Select key column</option></select>
+      </div>
+      <div id="dup-result"></div>
+    </div>
+
+</div>
+
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+let allRows=[], headers=[], colStats=[], filteredRows=[];
+let sortCol=-1, sortDir=1, currentPage=0, pageSize=50;
+let activeFilters=[];
+
+const NULL_VALS = new Set(['','na','null','none','nan','n/a','#n/a','nil']);
+const isNull = v => NULL_VALS.has((v||'').toLowerCase().trim());
+
+// ════════════════════════════════════════
+// LOAD
+// ════════════════════════════════════════
+function setupDrop(el, inputEl){
+  el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('dragover')});
+  el.addEventListener('dragleave',()=>el.classList.remove('dragover'));
+  el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('dragover');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])});
+  inputEl.addEventListener('change',()=>{if(inputEl.files[0])loadFile(inputEl.files[0])});
+}
+setupDrop(document.getElementById('drop-zone'), document.getElementById('file-input'));
+document.getElementById('reload-input').addEventListener('change',e=>{if(e.target.files[0])loadFile(e.target.files[0])});
+
+function loadFile(file){
+  const r=new FileReader();
+  r.onload=e=>parseCSV(e.target.result, file.name, file.size);
+  r.readAsText(file);
+}
+
+function parseCSV(text, name, size){
+  const lines = text.trim().split(/\r?\n/);
+  const sep = lines[0].includes('\t') ? '\t' : ',';
+  headers = splitLine(lines[0], sep);
+  allRows = lines.slice(1).filter(l=>l.trim()).map(l=>splitLine(l,sep));
+  document.getElementById('file-info').textContent =
+    `${name}  ·  ${allRows.length.toLocaleString()} rows  ·  ${headers.length} cols  ·  ${(size/1024).toFixed(1)} KB`;
+  computeColStats();
+  filteredRows=[...allRows];
+  activeFilters=[];
+  renderOverview();
+  renderColumns();
+  renderTableHeaders();
+  renderPage();
+  renderMissing();
+  populateVizSelectors();
+  populateDupSelector();
+  document.getElementById('landing').style.display='none';
+  document.getElementById('app').classList.add('visible');
+}
+
+function splitLine(line, sep){
+  const res=[]; let cur=''; let inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){inQ=!inQ;continue}
+    if(c===sep&&!inQ){res.push(cur.trim());cur='';continue}
+    cur+=c;
+  }
+  res.push(cur.trim());
+  return res;
+}
+
+// ════════════════════════════════════════
+// COL STATS
+// ════════════════════════════════════════
+function computeColStats(){
+  colStats=headers.map((h,ci)=>{
+    const vals=allRows.map(r=>r[ci]??'');
+    const missing=vals.filter(v=>isNull(v)).length;
+    const present=vals.filter(v=>!isNull(v));
+    const nums=present.map(Number).filter(n=>!isNaN(n));
+    const isNum=nums.length>present.length*0.8&&present.length>0;
+
+    // date detect
+    const dateSamples=present.slice(0,20);
+    const isDate=!isNum&&dateSamples.length>5&&dateSamples.filter(v=>!isNaN(Date.parse(v))).length>dateSamples.length*0.7;
+
+    let type = isNum?'numeric': isDate?'date': 'text';
+    const s={name:h, missing, total:vals.length, type};
+
+    if(isNum&&nums.length){
+      const sorted=[...nums].sort((a,b)=>a-b);
+      s.min=sorted[0]; s.max=sorted[sorted.length-1];
+      s.mean=nums.reduce((a,b)=>a+b,0)/nums.length;
+      s.median=sorted[Math.floor(sorted.length/2)];
+      const variance=nums.reduce((acc,v)=>acc+(v-s.mean)**2,0)/nums.length;
+      s.std=Math.sqrt(variance);
+      s.q1=sorted[Math.floor(sorted.length*0.25)];
+      s.q3=sorted[Math.floor(sorted.length*0.75)];
+      const iqr=s.q3-s.q1;
+      s.outliers=nums.filter(v=>v<s.q1-1.5*iqr||v>s.q3+1.5*iqr).length;
+      s.unique=new Set(nums).size;
+      if(s.max>s.min){
+        const bins=10; const bw=(s.max-s.min)/bins;
+        s.hist=Array(bins).fill(0);
+        nums.forEach(n=>{const b=Math.min(Math.floor((n-s.min)/bw),bins-1);s.hist[b]++});
+      }
+      s.nums=nums;
+    } else {
+      const freq={};
+      present.forEach(v=>{freq[v]=(freq[v]||0)+1});
+      const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+      s.unique=sorted.length;
+      s.topVals=sorted.slice(0,6);
+      if(new Set(present.map(v=>v.toLowerCase())).size<=2) s.type='boolean';
+    }
+    return s;
+  });
+}
+
+// ════════════════════════════════════════
+// OVERVIEW
+// ════════════════════════════════════════
+function renderOverview(){
+  const numCols=colStats.filter(c=>c.type==='numeric').length;
+  const totalMissing=colStats.reduce((s,c)=>s+c.missing,0);
+  const missingPct=((totalMissing/(allRows.length*headers.length||1))*100).toFixed(1);
+  const dupCount=countExactDups();
+
+  document.getElementById('overview-stats').innerHTML=[
+    {val:allRows.length.toLocaleString(),lbl:'Rows'},
+    {val:headers.length,lbl:'Columns'},
+    {val:numCols,lbl:'Numeric cols'},
+    {val:missingPct+'%',lbl:'Missing values'},
+    {val:dupCount,lbl:'Duplicate rows'},
+    {val:((new Blob([JSON.stringify(allRows)]).size)/1024).toFixed(0)+' KB',lbl:'Memory'},
+  ].map(s=>`<div class="stat-card"><div class="stat-val">${s.val}</div><div class="stat-lbl">${s.lbl}</div></div>`).join('');
+
+  // Warnings
+  let warns='';
+  const highMissing=colStats.filter(c=>c.missing/c.total>0.3);
+  if(highMissing.length) warns+=`<div class="warn-card"><span class="warn-icon">⚠</span><div class="warn-text">${highMissing.length} column(s) have >30% missing values: ${highMissing.map(c=>c.name).join(', ')}</div></div>`;
+  if(dupCount>0) warns+=`<div class="warn-card"><span class="warn-icon">⚠</span><div class="warn-text">${dupCount} exact duplicate rows found</div></div>`;
+  const highOutliers=colStats.filter(c=>c.outliers>0);
+  if(highOutliers.length) warns+=`<div class="warn-card"><span class="warn-icon">⚠</span><div class="warn-text">Outliers detected in: ${highOutliers.map(c=>`${c.name} (${c.outliers})`).join(', ')}</div></div>`;
+  document.getElementById('overview-warnings').innerHTML=warns;
+
+  // Type breakdown
+  const types={};
+  colStats.forEach(c=>types[c.type]=(types[c.type]||0)+1);
+  const colors={numeric:'var(--accent)',text:'var(--green)',boolean:'var(--yellow)',date:'var(--purple)'};
+  document.getElementById('type-breakdown').innerHTML=
+    `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">`+
+    Object.entries(types).map(([k,v])=>
+      `<div style="display:flex;align-items:center;gap:6px;font-size:0.8rem">
+        <span style="width:10px;height:10px;border-radius:2px;background:${colors[k]||'var(--muted)'};display:inline-block"></span>
+        <span style="color:var(--muted)">${k}</span>
+        <span style="font-family:var(--mono)">${v}</span>
+      </div>`).join('')+`</div>`;
+
+  // Copy buttons
+  document.getElementById('copy-btns').innerHTML=`
+    <button class="btn" onclick="copyAs('python')">Python list of columns</button>
+    <button class="btn" onclick="copyAs('r')">R column names</button>
+    <button class="btn" onclick="copyAs('markdown')">Markdown table (first 10 rows)</button>
+    <button class="btn" onclick="copyAs('json-schema')">JSON schema</button>`;
+}
+
+function copyAs(type){
+  let txt='';
+  if(type==='python') txt=`columns = ${JSON.stringify(headers)}`;
+  else if(type==='r') txt=`columns <- c(${headers.map(h=>`"${h}"`).join(', ')})`;
+  else if(type==='markdown'){
+    const rows=allRows.slice(0,10);
+    txt=`| ${headers.join(' | ')} |\n| ${headers.map(()=>'---').join(' | ')} |\n`+
+      rows.map(r=>`| ${r.join(' | ')} |`).join('\n');
+  } else if(type==='json-schema'){
+    const props={};
+    colStats.forEach(c=>{props[c.name]={type:c.type==='numeric'?'number':c.type==='boolean'?'boolean':'string'}});
+    txt=JSON.stringify({type:'object',properties:props},null,2);
+  }
+  navigator.clipboard.writeText(txt).then(()=>alert('Copied to clipboard!'));
+}
+
+// ════════════════════════════════════════
+// COLUMNS
+// ════════════════════════════════════════
+function renderColumns(){
+  document.getElementById('col-grid').innerHTML=colStats.map((c)=>{
+    const missingPct=(c.missing/c.total*100).toFixed(1);
+    let inner='';
+    if(c.type==='numeric'){
+      inner+=`<div class="col-stats-grid">
+        <div class="cs-item"><div class="k">min</div><div class="v">${fmt(c.min)}</div></div>
+        <div class="cs-item"><div class="k">max</div><div class="v">${fmt(c.max)}</div></div>
+        <div class="cs-item"><div class="k">mean</div><div class="v">${fmt(c.mean)}</div></div>
+        <div class="cs-item"><div class="k">median</div><div class="v">${fmt(c.median)}</div></div>
+        <div class="cs-item"><div class="k">std</div><div class="v">${fmt(c.std)}</div></div>
+        <div class="cs-item"><div class="k">outliers</div><div class="v" style="color:${c.outliers>0?'var(--red)':'var(--green)'}">${c.outliers}</div></div>
+      </div>`;
+      if(c.hist){const mx=Math.max(...c.hist);inner+=`<div class="sparkline">${c.hist.map(v=>`<div class="spark-bar" style="height:${Math.max(4,v/mx*100)}%"></div>`).join('')}</div>`}
+    } else {
+      inner+=`<div class="col-stats-grid">
+        <div class="cs-item"><div class="k">unique</div><div class="v">${c.unique}</div></div>
+        <div class="cs-item"><div class="k">present</div><div class="v">${c.total-c.missing}</div></div>
+      </div>`;
+      if(c.topVals){const mx=c.topVals[0]?.[1]||1;inner+=`<div>${c.topVals.map(([k,v])=>`<div class="freq-row"><div class="freq-label" title="${k}">${k||'(empty)'}</div><div class="freq-track"><div class="freq-fill" style="width:${v/mx*100}%"></div></div><div class="freq-n">${v}</div></div>`).join('')}</div>`}
+    }
+    inner+=`<div class="missing-bar"><div class="missing-fill" style="width:${missingPct}%"></div></div><div class="missing-lbl">${missingPct}% missing</div>`;
+    return `<div class="col-card"><div class="col-head"><div class="col-name">${c.name}</div><span class="badge badge-${c.type}">${c.type}</span></div>${inner}</div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+// DATA TABLE
+// ════════════════════════════════════════
+function renderTableHeaders(){
+  document.getElementById('tbl-head').innerHTML=
+    `<tr>${headers.map((h,i)=>`<th onclick="sortBy(${i})">${h}</th>`).join('')}</tr>`;
+}
+
+function sortBy(ci){
+  document.querySelectorAll('#tbl-head th').forEach((t,i)=>{t.classList.remove('sort-asc','sort-desc')});
+  sortDir = sortCol===ci ? sortDir*-1 : 1;
+  sortCol=ci;
+  document.querySelectorAll('#tbl-head th')[ci].classList.add(sortDir===1?'sort-asc':'sort-desc');
+  applySort();
+  currentPage=0;
+  renderPage();
+}
+
+function applySort(){
+  if(sortCol<0) return;
+  const isNum=colStats[sortCol]?.type==='numeric';
+  filteredRows.sort((a,b)=>{
+    const av=a[sortCol]||'', bv=b[sortCol]||'';
+    if(isNum) return ((parseFloat(av)||0)-(parseFloat(bv)||0))*sortDir;
+    return av.localeCompare(bv)*sortDir;
+  });
+}
+
+function applyAllFilters(){
+  const q=document.getElementById('search-box').value.toLowerCase();
+  filteredRows=allRows.filter(r=>{
+    if(q&&!r.some(c=>c.toLowerCase().includes(q))) return false;
+    for(const f of activeFilters){
+      const v=(r[f.col]||'').toLowerCase();
+      const fv=(f.val||'').toLowerCase();
+      if(f.op==='contains'&&!v.includes(fv)) return false;
+      if(f.op==='equals'&&v!==fv) return false;
+      if(f.op==='not_equals'&&v===fv) return false;
+      if(f.op==='gt'&&!(parseFloat(r[f.col])>parseFloat(f.val))) return false;
+      if(f.op==='lt'&&!(parseFloat(r[f.col])<parseFloat(f.val))) return false;
+      if(f.op==='is_null'&&!isNull(r[f.col])) return false;
+      if(f.op==='not_null'&&isNull(r[f.col])) return false;
+    }
+    return true;
+  });
+  if(sortCol>=0) applySort();
+  currentPage=0;
+  renderPage();
+}
+
+document.getElementById('search-box').addEventListener('input',applyAllFilters);
+document.getElementById('page-size-sel')?.addEventListener('change',e=>{pageSize=parseInt(e.target.value);currentPage=0;renderPage()});
+
+// Filter builder
+function addFilterRow(){
+  activeFilters.push({col:0,op:'contains',val:''});
+  renderFilterBuilder();
+}
+
+function renderFilterBuilder(){
+  const wrap=document.getElementById('filter-builder-wrap');
+  if(activeFilters.length===0){wrap.innerHTML='';return}
+  wrap.innerHTML=`<div class="filter-builder"><div class="sec-title" style="margin-bottom:10px">Active filters</div>`+
+    activeFilters.map((f,i)=>`
+      <div class="filter-row">
+        <select onchange="activeFilters[${i}].col=parseInt(this.value);applyAllFilters()">
+          ${headers.map((h,j)=>`<option value="${j}" ${j===f.col?'selected':''}>${h}</option>`).join('')}
+        </select>
+        <select onchange="activeFilters[${i}].op=this.value;applyAllFilters()">
+          <option value="contains" ${f.op==='contains'?'selected':''}>contains</option>
+          <option value="equals" ${f.op==='equals'?'selected':''}>equals</option>
+          <option value="not_equals" ${f.op==='not_equals'?'selected':''}>not equals</option>
+          <option value="gt" ${f.op==='gt'?'selected':''}>></option>
+          <option value="lt" ${f.op==='lt'?'selected':''}>< </option>
+          <option value="is_null" ${f.op==='is_null'?'selected':''}>is null</option>
+          <option value="not_null" ${f.op==='not_null'?'selected':''}>not null</option>
+        </select>
+        ${['is_null','not_null'].includes(f.op)?'':
+          `<input value="${f.val}" placeholder="value" onchange="activeFilters[${i}].val=this.value;applyAllFilters()" oninput="activeFilters[${i}].val=this.value;applyAllFilters()"/>`}
+        <button class="rm-filter" onclick="activeFilters.splice(${i},1);renderFilterBuilder();applyAllFilters()">✕</button>
+      </div>`).join('')+`</div>`;
+}
+
+function renderPage(){
+  const start=currentPage*pageSize;
+  const slice=filteredRows.slice(start,start+pageSize);
+  // outlier index per col
+  const outlierSets={};
+  colStats.forEach((c,ci)=>{
+    if(c.type==='numeric'&&c.q1!==undefined){
+      const iqr=c.q3-c.q1;
+      outlierSets[ci]={lo:c.q1-1.5*iqr,hi:c.q3+1.5*iqr};
+    }
+  });
+  document.getElementById('tbl-body').innerHTML=slice.map(r=>
+    `<tr>${headers.map((_,i)=>{
+      const v=r[i]??'';
+      const isN=isNull(v);
+      const ols=outlierSets[i];
+      const isOut=ols&&!isN&&(parseFloat(v)<ols.lo||parseFloat(v)>ols.hi);
+      return `<td class="${isN?'null-cell':isOut?'outlier-cell':''}" title="${v}">${v||'·'}</td>`;
+    }).join('')}</tr>`).join('');
+  const total=filteredRows.length;
+  document.getElementById('row-count').textContent=`${total.toLocaleString()} rows`;
+  document.getElementById('page-info').textContent=`${currentPage+1} / ${Math.ceil(total/pageSize)||1}`;
+  document.getElementById('prev-btn').disabled=currentPage===0;
+  document.getElementById('next-btn').disabled=(currentPage+1)*pageSize>=total;
+}
+
+function changePage(d){currentPage+=d;renderPage()}
+
+// Export
+document.getElementById('export-btn').onclick=()=>{
+  const csv=[headers.join(','),...filteredRows.map(r=>r.map(v=>`"${(v||'').replace(/"/g,'""')}"`).join(','))].join('\n');
+  dl(new Blob([csv],{type:'text/csv'}),'filtered.csv');
+};
+document.getElementById('export-json-btn').onclick=()=>{
+  const obj=filteredRows.map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??''])));
+  dl(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),'data.json');
+};
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click()}
+
+// ════════════════════════════════════════
+// VISUALISE
+// ════════════════════════════════════════
+function populateVizSelectors(){
+  const numCols=colStats.filter(c=>c.type==='numeric');
+  const allC=colStats;
+  const xSel=document.getElementById('viz-col-x');
+  const ySel=document.getElementById('viz-col-y');
+  xSel.innerHTML=allC.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
+  ySel.innerHTML=numCols.map(c=>`<option value="${colStats.indexOf(c)}">${c.name}</option>`).join('');
+  document.getElementById('viz-type').onchange=()=>{
+    const t=document.getElementById('viz-type').value;
+    document.getElementById('viz-col-y').style.display=['scatter','line'].includes(t)?'':'none';
+  };
+}
+
+function renderViz(){
+  const type=document.getElementById('viz-type').value;
+  const xIdx=parseInt(document.getElementById('viz-col-x').value);
+  const yIdx=parseInt(document.getElementById('viz-col-y').value);
+  const c=colStats[xIdx];
+  const container=document.getElementById('chart-container');
+
+  const W=container.clientWidth-32, H=360;
+  const pad={top:20,right:20,bottom:50,left:60};
+  const iW=W-pad.left-pad.right, iH=H-pad.top-pad.bottom;
+
+  let svg=`<svg id="viz-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'IBM Plex Mono',monospace">`;
+  svg+=`<rect width="${W}" height="${H}" fill="#161b27" rx="4"/>`;
+  svg+=`<g transform="translate(${pad.left},${pad.top})">`;
+
+  if(type==='histogram'&&c.type==='numeric'){
+    const bins=20; const bw=(c.max-c.min)/bins||1;
+    const hist=Array(bins).fill(0);
+    const vals=filteredRows.map(r=>parseFloat(r[xIdx])).filter(n=>!isNaN(n));
+    vals.forEach(n=>{const b=Math.min(Math.floor((n-c.min)/bw),bins-1);hist[b]++});
+    const maxH=Math.max(...hist);
+    const xScale=v=>(v-c.min)/(c.max-c.min||1)*iW;
+    const yScale=v=>(1-v/maxH)*iH;
+    hist.forEach((h,i)=>{
+      const x=i*(iW/bins), w=iW/bins-1, y=yScale(h), barH=iH-y;
+      svg+=`<rect x="${x}" y="${y}" width="${w}" height="${barH}" fill="#4f8ef7" opacity="0.75" rx="1"/>`;
+    });
+    // axes
+    svg+=axis(iW,iH,c.min,c.max,0,maxH,'x-numeric','y-count');
+
+  } else if(type==='bar'&&c.topVals){
+    const top=c.topVals.slice(0,10);
+    const maxV=top[0][1];
+    const bh=iH/top.length-4;
+    top.forEach(([k,v],i)=>{
+      const bw=v/maxV*iW;
+      const y=i*(iH/top.length);
+      svg+=`<rect x="0" y="${y}" width="${bw}" height="${bh}" fill="#3ecf8e" opacity="0.8" rx="2"/>`;
+      svg+=`<text x="${bw+4}" y="${y+bh/2+4}" fill="#6b7a99" font-size="10">${v}</text>`;
+      svg+=`<text x="-4" y="${y+bh/2+4}" fill="#6b7a99" font-size="10" text-anchor="end">${k.slice(0,14)}</text>`;
+    });
+
+  } else if(type==='scatter'){
+    const xC=colStats[xIdx], yC=colStats[yIdx];
+    const xVals=filteredRows.map(r=>parseFloat(r[xIdx])).map(n=>isNaN(n)?null:n);
+    const yVals=filteredRows.map(r=>parseFloat(r[yIdx])).map(n=>isNaN(n)?null:n);
+    const xMin=Math.min(...xVals.filter(Boolean)), xMax=Math.max(...xVals.filter(Boolean));
+    const yMin=Math.min(...yVals.filter(Boolean)), yMax=Math.max(...yVals.filter(Boolean));
+    const sx=v=>(v-xMin)/(xMax-xMin||1)*iW;
+    const sy=v=>(1-(v-yMin)/(yMax-yMin||1))*iH;
+    const sample=xVals.length>2000?xVals.map((_,i)=>i).filter(i=>i%Math.ceil(xVals.length/2000)===0):[...xVals.keys()];
+    sample.forEach(i=>{if(xVals[i]!=null&&yVals[i]!=null)svg+=`<circle cx="${sx(xVals[i])}" cy="${sy(yVals[i])}" r="3" fill="#4f8ef7" opacity="0.5"/>`;});
+    svg+=axis(iW,iH,xMin,xMax,yMin,yMax,xC.name,yC.name);
+
+  } else if(type==='boxplot'&&c.type==='numeric'){
+    const x=iW/2, bw=iW*0.35;
+    const sy=v=>(1-(v-c.min)/(c.max-c.min||1))*iH;
+    const median=sy(c.median), q1=sy(c.q1), q3=sy(c.q3);
+    const whiskerLo=sy(Math.max(c.min,c.q1-1.5*(c.q3-c.q1)));
+    const whiskerHi=sy(Math.min(c.max,c.q3+1.5*(c.q3-c.q1)));
+    svg+=`<line x1="${x}" y1="${whiskerHi}" x2="${x}" y2="${q3}" stroke="#6b7a99" stroke-width="1.5"/>`;
+    svg+=`<rect x="${x-bw/2}" y="${q3}" width="${bw}" height="${q1-q3}" fill="#1a3a5c" stroke="#4f8ef7" stroke-width="1.5" rx="2"/>`;
+    svg+=`<line x1="${x-bw/2}" y1="${median}" x2="${x+bw/2}" y2="${median}" stroke="#4f8ef7" stroke-width="2.5"/>`;
+    svg+=`<line x1="${x}" y1="${q1}" x2="${x}" y2="${whiskerLo}" stroke="#6b7a99" stroke-width="1.5"/>`;
+    // outlier dots
+    const iqr=c.q3-c.q1;
+    if(c.nums)c.nums.filter(v=>v<c.q1-1.5*iqr||v>c.q3+1.5*iqr).slice(0,100).forEach(v=>{
+      svg+=`<circle cx="${x+(Math.random()-0.5)*bw*0.6}" cy="${sy(v)}" r="3" fill="#f76f6f" opacity="0.7"/>`;
+    });
+    svg+=axis(iW,iH,'','',c.min,c.max,c.name,'value');
+
+  } else if(type==='line'&&c.type==='numeric'){
+    const xC=colStats[xIdx], yC=colStats[yIdx];
+    const pts=filteredRows.slice(0,500).map((r,i)=>({x:i,y:parseFloat(r[yIdx])})).filter(p=>!isNaN(p.y));
+    const yMin=Math.min(...pts.map(p=>p.y)), yMax=Math.max(...pts.map(p=>p.y));
+    const sx=v=>v/(pts.length-1||1)*iW;
+    const sy=v=>(1-(v-yMin)/(yMax-yMin||1))*iH;
+    const d=pts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ');
+    svg+=`<path d="${d}" fill="none" stroke="#4f8ef7" stroke-width="1.5" opacity="0.9"/>`;
+    svg+=axis(iW,iH,0,pts.length,'','',(pts.length>500?'index (first 500)':xC.name),yC.name);
+  } else {
+    container.innerHTML=`<div style="color:var(--muted);padding:40px;text-align:center">Select a compatible column type for this chart.</div>`;
+    return;
+  }
+
+  svg+=`</g></svg>`;
+  container.innerHTML=svg;
+}
+
+function axis(iW,iH,xMin,xMax,yMin,yMax,xLabel,yLabel){
+  let s='';
+  s+=`<line x1="0" y1="${iH}" x2="${iW}" y2="${iH}" stroke="#2a3347" stroke-width="1"/>`;
+  s+=`<line x1="0" y1="0" x2="0" y2="${iH}" stroke="#2a3347" stroke-width="1"/>`;
+  if(xMin!==''&&xMax!==''){
+    s+=`<text x="0" y="${iH+14}" fill="#6b7a99" font-size="9">${fmt(xMin)}</text>`;
+    s+=`<text x="${iW}" y="${iH+14}" fill="#6b7a99" font-size="9" text-anchor="end">${fmt(xMax)}</text>`;
+  }
+  if(yMin!==''&&yMax!==''){
+    s+=`<text x="-4" y="${iH}" fill="#6b7a99" font-size="9" text-anchor="end">${fmt(yMin)}</text>`;
+    s+=`<text x="-4" y="10" fill="#6b7a99" font-size="9" text-anchor="end">${fmt(yMax)}</text>`;
+  }
+  if(xLabel) s+=`<text x="${iW/2}" y="${iH+32}" fill="#6b7a99" font-size="10" text-anchor="middle">${xLabel}</text>`;
+  if(yLabel) s+=`<text x="-8" y="${iH/2}" fill="#6b7a99" font-size="10" text-anchor="middle" transform="rotate(-90,-8,${iH/2})">${yLabel}</text>`;
+  return s;
+}
+
+function exportSVG(){
+  const svg=document.getElementById('viz-svg');
+  if(!svg){alert('Draw a chart first.');return}
+  dl(new Blob([svg.outerHTML],{type:'image/svg+xml'}),'chart.svg');
+}
+
+// ════════════════════════════════════════
+// CORRELATIONS
+// ════════════════════════════════════════
+function renderCorr(){
+  const numCols=colStats.map((c,i)=>({c,i})).filter(({c})=>c.type==='numeric');
+  if(numCols.length<2){document.getElementById('corr-container').innerHTML='<div style="color:var(--muted);padding:20px">Need at least 2 numeric columns.</div>';return}
+
+  const n=numCols.length;
+  const matrix=Array(n).fill(0).map(()=>Array(n).fill(0));
+  for(let a=0;a<n;a++){
+    for(let b=a;b<n;b++){
+      const r=pearson(numCols[a].i, numCols[b].i);
+      matrix[a][b]=r; matrix[b][a]=r;
+    }
+  }
+
+  const cellSize=Math.min(52, Math.floor((document.getElementById('panel-correlations').clientWidth-180)/(n+1)));
+  let html=`<div style="display:flex;gap:4px;align-items:flex-end;margin-bottom:4px">
+    <div style="width:${cellSize}px;height:${cellSize*2}px"></div>`;
+  numCols.forEach(({c})=>{html+=`<div style="width:${cellSize}px;height:${cellSize*2}px;display:flex;align-items:flex-end;justify-content:center"><div style="writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--mono);font-size:10px;color:var(--muted);max-height:${cellSize*2}px;overflow:hidden;white-space:nowrap">${c.name}</div></div>`});
+  html+=`</div>`;
+
+  numCols.forEach(({c:rowC},a)=>{
+    html+=`<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center">
+      <div style="width:${cellSize}px;font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${rowC.name}</div>`;
+    numCols.forEach((_,b)=>{
+      const r=matrix[a][b];
+      const abs=Math.abs(r);
+      const bg = a===b ? '#1e2535' :
+        r>0 ? `rgba(79,142,247,${abs*0.85})` : `rgba(247,111,111,${abs*0.85})`;
+      const textColor = abs>0.5 ? '#fff' : '#6b7a99';
+      html+=`<div title="${numCols[a].c.name} × ${numCols[b].c.name}: ${r.toFixed(3)}" style="width:${cellSize}px;height:${cellSize}px;background:${bg};border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:${textColor};cursor:default">${a===b?'1':r.toFixed(2)}</div>`;
+    });
+    html+=`</div>`;
+  });
+
+  // Legend
+  html+=`<div style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:0.72rem;color:var(--muted)">
+    <span>−1</span>
+    <div style="width:120px;height:8px;border-radius:4px;background:linear-gradient(to right,#f76f6f,#1e2535,#4f8ef7)"></div>
+    <span>+1</span>
+    <span style="margin-left:12px">Hover cells for exact values</span>
+  </div>`;
+
+  document.getElementById('corr-container').innerHTML=html;
+}
+
+function pearson(ci, cj){
+  const pairs=filteredRows.map(r=>[parseFloat(r[ci]),parseFloat(r[cj])]).filter(([a,b])=>!isNaN(a)&&!isNaN(b));
+  if(pairs.length<3) return 0;
+  const n=pairs.length;
+  const mx=pairs.reduce((s,[a])=>s+a,0)/n;
+  const my=pairs.reduce((s,[,b])=>s+b,0)/n;
+  const num=pairs.reduce((s,[a,b])=>s+(a-mx)*(b-my),0);
+  const dx=Math.sqrt(pairs.reduce((s,[a])=>s+(a-mx)**2,0));
+  const dy=Math.sqrt(pairs.reduce((s,[,b])=>s+(b-my)**2,0));
+  return (dx&&dy)?num/(dx*dy):0;
+}
+
+// ════════════════════════════════════════
+// MISSING
+// ════════════════════════════════════════
+function renderMissing(){
+  const hasMissing=colStats.some(c=>c.missing>0);
+  if(!hasMissing){document.getElementById('missing-content').innerHTML=`<div class="no-missing">✓ No missing values found.</div>`;return}
+  const sorted=[...colStats].sort((a,b)=>b.missing-a.missing).filter(c=>c.missing>0);
+  const maxM=sorted[0].missing;
+  document.getElementById('missing-content').innerHTML=sorted.map(c=>{
+    const pct=(c.missing/c.total*100).toFixed(1);
+    const col=c.missing/maxM>0.5?'var(--red)':c.missing/maxM>0.2?'var(--yellow)':'var(--accent)';
+    return `<div class="mv-row"><div class="mv-col">${c.name}</div><div class="mv-track"><div class="mv-fill" style="width:${c.missing/maxM*100}%;background:${col}"></div></div><div class="mv-pct">${pct}%</div><div class="mv-n">${c.missing.toLocaleString()} rows</div></div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+// DUPLICATES
+// ════════════════════════════════════════
+function countExactDups(){
+  const seen=new Set(); let dups=0;
+  allRows.forEach(r=>{const k=r.join('|||');seen.has(k)?dups++:seen.add(k)});
+  return dups;
+}
+
+function populateDupSelector(){
+  document.getElementById('dup-key-col').innerHTML=
+    `<option>Select key column</option>`+headers.map((h,i)=>`<option value="${i}">${h}</option>`).join('');
+}
+
+function findDuplicates(mode){
+  const el=document.getElementById('dup-result');
+  if(mode==='exact'){
+    const freq={};
+    allRows.forEach((r,i)=>{const k=r.join('|||');(freq[k]=freq[k]||[]).push(i+2)});
+    const dups=Object.entries(freq).filter(([,v])=>v.length>1);
+    if(!dups.length){el.innerHTML=`<div class="no-missing">✓ No exact duplicate rows found.</div>`;return}
+    el.innerHTML=`<div class="dup-result">Found <span>${dups.length}</span> groups of duplicate rows (${dups.reduce((s,[,v])=>s+v.length-1,0)} excess rows)</div>`+
+      `<div class="tbl-wrap" style="max-height:300px"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}<th>Rows</th></tr></thead><tbody>`+
+      dups.slice(0,50).map(([k,rows])=>{const r=k.split('|||');return`<tr>${r.map(v=>`<td>${v}</td>`).join('')}<td style="color:var(--red)">${rows.join(', ')}</td></tr>`}).join('')+
+      `</tbody></table></div>`;
+  } else {
+    const ci=parseInt(document.getElementById('dup-key-col').value);
+    if(isNaN(ci)){alert('Select a key column first.');return}
+    const freq={};
+    allRows.forEach((r,i)=>{const k=r[ci];(freq[k]=freq[k]||[]).push(i+2)});
+    const dups=Object.entries(freq).filter(([,v])=>v.length>1);
+    if(!dups.length){el.innerHTML=`<div class="no-missing">✓ No duplicate keys found.</div>`;return}
+    el.innerHTML=`<div class="dup-result">Found <span>${dups.length}</span> duplicate key values in <span>${headers[ci]}</span></div>`+
+      dups.slice(0,100).map(([k,rows])=>`<div class="mv-row"><div class="mv-col">${k}</div><div style="font-family:var(--mono);font-size:0.75rem;color:var(--red)">${rows.length}× — rows ${rows.slice(0,6).join(', ')}${rows.length>6?'…':''}</div></div>`).join('');
+  }
+}
+
+// ════════════════════════════════════════
+// TABS
+// ════════════════════════════════════════
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+// ════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════
+function fmt(n){
+  if(n===undefined||n===null) return '—';
+  if(Math.abs(n)>=1e6||( Math.abs(n)<0.001&&n!==0)) return n.toExponential(2);
+  return parseFloat(n.toFixed(4)).toString();
+}
+</script>
+</body>
+</html>
