@@ -151,30 +151,6 @@ Everything runs locally using the browser's built-in JavaScript engine and Canva
 3. Navigate between tabs to explore your data
 4. Use **Load new file** in the top-right to switch datasets without refreshing
 
----
-
-## Deploy your own instance (GitHub Pages)
-
-You only need a free GitHub account.
-
-**Step 1 — Create a repository**
-
-Go to [github.com](https://github.com) → **+** → **New repository** → name it `csv-explorer` → set to **Public** → **Create repository**
-
-**Step 2 — Upload the file**
-
-On the repo page → **Add file** → **Upload files** → upload `csv_explorer.html` and rename it to `index.html` (or upload it as `index.html` directly) → also upload `README.md` → **Commit changes**
-
-**Step 3 — Enable GitHub Pages**
-
-**Settings** → **Pages** → under Branch select `main` and folder `/` (root) → **Save**
-
-**Step 4 — Done**
-
-Your instance will be live at `https://yourusername.github.io/csv-explorer` within 1–2 minutes.
-
----
-
 ## Browser compatibility
 
 | Browser | Support |
@@ -185,25 +161,6 @@ Your instance will be live at `https://yourusername.github.io/csv-explorer` with
 | Mobile Chrome (Android) | ✅ Full |
 | Mobile Safari (iOS) | ✅ Full |
 
----
-
-## Local use (no internet required)
-
-After removing the Google Fonts `<link>` tag, the file works fully offline:
-
-```bash
-# macOS / Linux
-open csv_explorer.html
-
-# Windows
-start csv_explorer.html
-
-# Or serve locally
-python3 -m http.server 8080
-# then open http://localhost:8080/csv_explorer.html
-```
-
----
 
 ## Tech stack
 
